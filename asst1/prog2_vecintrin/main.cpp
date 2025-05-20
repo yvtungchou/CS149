@@ -21,6 +21,7 @@ float arraySumVector(float* values, int N);
 bool verifyResult(float* values, int* exponents, float* output, float* gold, int N);
 
 int main(int argc, char * argv[]) {
+
   int N = 16;
   bool printLog = false;
 
@@ -60,8 +61,10 @@ int main(int argc, char * argv[]) {
   float* gold = new float[N+VECTOR_WIDTH];
   initValue(values, exponents, output, gold, N);
 
+
   clampedExpSerial(values, exponents, gold, N);
   clampedExpVector(values, exponents, output, N);
+  printf("vector finished");
 
   //absSerial(values, gold, N);
   //absVector(values, output, N);
@@ -245,7 +248,70 @@ void clampedExpVector(float* values, int* exponents, float* output, int N) {
   //
   // CS149 STUDENTS TODO: Implement your vectorized version of
   // clampedExpSerial() here.
-  //
+
+  __cs149_vec_float x;
+  __cs149_vec_int y;
+  __cs149_vec_int count;
+  __cs149_vec_float result;
+  __cs149_vec_float zero_float = _cs149_vset_float(0.f);
+  __cs149_vec_int zero_int = _cs149_vset_int(0);
+  __cs149_vec_float one_float = _cs149_vset_float(1.f);
+  __cs149_vec_int one_int = _cs149_vset_int(1);
+  __cs149_vec_float nine_float = _cs149_vset_float(9.999999f);
+  __cs149_mask maskAll, maskEqualZero, maskNotEqualZero, maskCount, mask9;
+
+  for (int i=0; i<N; i+=VECTOR_WIDTH) {
+
+    int num_valid = VECTOR_WIDTH;
+
+    if (N < i + VECTOR_WIDTH) {
+      num_valid = N % VECTOR_WIDTH;
+    }
+
+    // Initialize maskAll
+    maskAll = _cs149_init_ones(num_valid);
+
+    // All zeros
+    maskEqualZero = _cs149_init_ones(0);
+    maskNotEqualZero = _cs149_init_ones(0);
+    maskCount = _cs149_init_ones(0);
+    mask9 = _cs149_init_ones(0);
+
+    // Load vector of values from contiguous memory addresses
+    _cs149_vload_float(x, values+i, maskAll);               // x = values[i];
+    _cs149_vload_int(y, exponents+i, maskAll);
+
+    // Set mask according to predicate
+    _cs149_veq_int(maskEqualZero, y, zero_int, maskAll);     // if (y == 0) {
+
+    _cs149_vstore_float(output+i, one_float, maskEqualZero);
+
+    // Inverse maskEqualZero to generate "else" mask
+    maskNotEqualZero = _cs149_mask_not(maskEqualZero);
+    
+    maskNotEqualZero = _cs149_mask_and(maskNotEqualZero, maskAll); // } else {
+
+    _cs149_vmove_float(result, x, maskNotEqualZero); // result = x
+
+    _cs149_vsub_int(count, y, one_int, maskNotEqualZero); // count = y - 1;
+
+    _cs149_vgt_int(maskCount, count, zero_int, maskNotEqualZero);
+
+    while (_cs149_cntbits(maskCount) > 0) {
+      _cs149_vmult_float(result, result, x, maskCount);
+
+      _cs149_vsub_int(count, count, one_int, maskCount);
+
+      _cs149_vgt_int(maskCount, count, zero_int, maskCount);
+
+    }
+
+    _cs149_vgt_float(mask9, result, nine_float, maskNotEqualZero); // if (result > 9.99f) {
+
+    _cs149_vset_float(result, 9.999999f, mask9);
+
+    _cs149_vstore_float(output+i, result, maskNotEqualZero);
+  }
   // Your solution should work for any value of
   // N and VECTOR_WIDTH, not just when VECTOR_WIDTH divides N
   //

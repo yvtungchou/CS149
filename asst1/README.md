@@ -313,14 +313,15 @@ different CPU cores).
   10,000 threads? (For this thought experiment, please discuss in the general case
   - i.e. don't tie your discussion to this given mandelbrot program.)
 
+  My Answer: ISPC task is a software level parallel while thread is a hardware level parallel. Once the number of task is given, the OS determines how many threads it should spawn accordingly. Different tasks might be assigned to the same thread, as these tasks won't be executed at the same time. By assigning tasks to threads instead of creating threads directly, we can reduce the overhead of thread creating and thus further increase performance.
+
 _The smart-thinking student's question_: Hey wait! Why are there two different
 mechanisms (`foreach` and `launch`) for expressing independent, parallelizable
 work to the ISPC system? Couldn't the system just partition the many iterations
 of `foreach` across all cores and also emit the appropriate SIMD code for the
 cores?
 
-_Answer_: Great question! And there are a lot of possible answers. Come to
-office hours.
+My Answer: It gives the programmer more flexibility. The programmer might want to contain the problem within certain number of cores without further extension (maybe they need other cores to fully focus on some other tasks).
 
 ## Program 4: Iterative `sqrt` (15 points) ##
 

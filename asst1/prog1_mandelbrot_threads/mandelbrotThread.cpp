@@ -22,6 +22,14 @@ extern void mandelbrotSerial(
     int maxIterations,
     int output[]);
 
+extern void mandelbrotSerial_beta(
+    float x0, float y0, float x1, float y1,
+    int width, int height,
+    int startRow, int totalRows,
+    int startCol, int totalCols,
+    int maxIterations,
+    int output[]);
+
 
 //
 // workerThreadStart --
@@ -34,8 +42,15 @@ void workerThreadStart(WorkerArgs * const args) {
     // to compute a part of the output image.  For example, in a
     // program that uses two threads, thread 0 could compute the top
     // half of the image and thread 1 could compute the bottom half.
+    // int numRows = args->height / 2;
+    // int numCols = args->width / 4;
+    // int startRow = (args->threadId / 4) * numRows;
+    // int startCol = (args->threadId % 4) * numCols;
+    // mandelbrotSerial_beta(args->x0, args->y0, args->x1, args->y1, args->width, args->height, startRow, numRows, startCol, numCols, args->maxIterations, args->output);
 
-    printf("Hello world from thread %d\n", args->threadId);
+    int numRows = args->height / args->numThreads;
+    int startRow = args->threadId * numRows;
+    mandelbrotSerial(args->x0, args->y0, args->x1, args->y1, args->width, args->height, startRow, numRows, args->maxIterations, args->output);
 }
 
 //
