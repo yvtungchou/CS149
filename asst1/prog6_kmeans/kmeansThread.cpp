@@ -6,6 +6,8 @@
 
 #include "CycleTimer.h"
 
+#include "assignment_ispc.h"
+
 using namespace std;
 
 typedef struct {
@@ -16,6 +18,7 @@ typedef struct {
   double *data;
   double *clusterCentroids;
   int *clusterAssignments;
+  int *curr_cluster
   double *currCost;
   int M, N, K;
 } WorkerArgs;
@@ -53,10 +56,10 @@ static bool stoppingConditionMet(double *prevCost, double *currCost,
  * @param nDim The dimensionality (number of elements) in each data point
  *     (must be the same for x and y).
  */
-double dist(double *x, double *y, int nDim) {
+double dist(double *x, double *y, int nDim, int nPts) {
   double accum = 0.0;
   for (int i = 0; i < nDim; i++) {
-    accum += pow((x[i] - y[i]), 2);
+    accum += pow((x[i * nPts] - y[i]), 2);
   }
   return sqrt(accum);
 }
@@ -66,24 +69,40 @@ double dist(double *x, double *y, int nDim) {
  */
 void computeAssignments(WorkerArgs *const args) {
   double *minDist = new double[args->M];
+
+  double startTime;
+  double endTime;
   
   // Initialize arrays
+  // startTime = CycleTimer::currentSeconds();
   for (int m =0; m < args->M; m++) {
     minDist[m] = 1e30;
     args->clusterAssignments[m] = -1;
   }
+  // endTime = CycleTimer::currentSeconds();
+  // printf("[loop1]: %.3f ms\n", (endTime - startTime) * 1000);
 
   // Assign datapoints to closest centroids
-  for (int k = args->start; k < args->end; k++) {
-    for (int m = 0; m < args->M; m++) {
-      double d = dist(&args->data[m * args->N],
-                      &args->clusterCentroids[k * args->N], args->N);
-      if (d < minDist[m]) {
-        minDist[m] = d;
-        args->clusterAssignments[m] = k;
-      }
-    }
-  }
+  // startTime = CycleTimer::currentSeconds();
+  
+  // for (int k = args->start; k < args->end; k++) {
+  //   for (int m = 0; m < args->M; m++) { // goal, make this for loop ispc style
+  //     double d = dist(&args->data[m * args->N],
+  //                     &args->clusterCentroids[k * args->N], args->N);
+  //     if (d < minDist[m]) {
+  //       minDist[m] = d;
+  //       args->clusterAssignments[m] = k;
+  //     }
+  //   }
+  // }
+  // endTime = CycleTimer::currentSeconds();
+  // printf("[none ispc]: %.3f ms\n", (endTime - startTime) * 1000);
+
+  // startTime = CycleTimer::currentSeconds();
+  // ispc::assignment_ispc(args->M, args->start, args->end, args->N, args->data, args->clusterCentroids, minDist, args->clusterAssignments);
+  ispc::assignment_ispc_withtasks(args->M, args->start, args->end, args->N, args->data, args->clusterCentroids, minDist, args->clusterAssignments); // using SIMD is not making good use of cache spatial locality
+  // endTime = CycleTimer::currentSeconds();
+  // printf("[ispc]: %.3f ms\n", (endTime - startTime) * 1000);
 
   free(minDist);
 }
@@ -103,16 +122,22 @@ void computeCentroids(WorkerArgs *const args) {
     }
   }
 
+  double startTime = CycleTimer::currentSeconds();
 
   // Sum up contributions from assigned examples
   for (int m = 0; m < args->M; m++) {
     int k = args->clusterAssignments[m];
     for (int n = 0; n < args->N; n++) {
-      args->clusterCentroids[k * args->N + n] +=
-          args->data[m * args->N + n];
+      // args->clusterCentroids[k * args->N + n] += args->data[m * args->N + n];
+      args->clusterCentroids[k * args->N + n] += args->data[n * args->M + m]; // this is going to be extremely slow in serial code
     }
     counts[k]++;
   }
+  
+  double endTime = CycleTimer::currentSeconds();
+  // printf("[computeCentroid sum Time]: %.3f ms\n", (endTime - startTime) * 1000);
+
+  
 
   // Compute means
   for (int k = 0; k < args->K; k++) {
@@ -136,12 +161,19 @@ void computeCost(WorkerArgs *const args) {
     accum[k] = 0.0;
   }
 
+  double startTime = CycleTimer::currentSeconds();
+
   // Sum cost for all data points assigned to centroid
   for (int m = 0; m < args->M; m++) {
     int k = args->clusterAssignments[m];
-    accum[k] += dist(&args->data[m * args->N],
-                     &args->clusterCentroids[k * args->N], args->N);
+    // accum[k] += dist(&args->data[m * args->N], &args->clusterCentroids[k * args->N], args->N);
+    accum[k] += dist(&args->data[m], &args->clusterCentroids[k * args->N], args->N, args->M);
   }
+  
+  double endTime = CycleTimer::currentSeconds();
+  printf("[computeCost loop Time]: %.3f ms\n", (endTime - startTime) * 1000);
+
+  
 
   // Update costs
   for (int k = args->start; k < args->end; k++) {
@@ -195,9 +227,12 @@ void kMeansThread(double *data, double *clusterCentroids, int *clusterAssignment
     currCost[k] = 0.0;
   }
 
+  double startTime;
+  double endTime;
   /* Main K-Means Algorithm Loop */
   int iter = 0;
   while (!stoppingConditionMet(prevCost, currCost, epsilon, K)) {
+    printf("[Iteration]: %d\n", iter);
     // Update cost arrays (for checking convergence criteria)
     for (int k = 0; k < K; k++) {
       prevCost[k] = currCost[k];
@@ -206,10 +241,24 @@ void kMeansThread(double *data, double *clusterCentroids, int *clusterAssignment
     // Setup args struct
     args.start = 0;
     args.end = K;
-
+    startTime = CycleTimer::currentSeconds();
     computeAssignments(&args);
+    endTime = CycleTimer::currentSeconds();
+    // printf("[computeAssignments]: %.3f ms\n", (endTime - startTime) * 1000);
+
+    startTime = CycleTimer::currentSeconds();
     computeCentroids(&args);
+    endTime = CycleTimer::currentSeconds();
+    // printf("[computeCentroids]: %.3f ms\n", (endTime - startTime) * 1000);
+
+    startTime = CycleTimer::currentSeconds();
     computeCost(&args);
+    endTime = CycleTimer::currentSeconds();
+    // printf("[computeCost]: %.3f ms\n", (endTime - startTime) * 1000);
+
+    // computeAssignments(&args);
+    // computeCentroids(&args);
+    // computeCost(&args);
 
     iter++;
   }

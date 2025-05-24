@@ -21,7 +21,8 @@ void logToFile(string filename, double sampleRate, double *data,
       logFile << "Example " << m << ", cluster " << clusterAssignments[m]
               << ": ";
       for (int n = 0; n < N; n++) {
-        logFile << data[m * N + n] << " ";
+        // logFile << data[m * N + n] << " ";
+        logFile << data[n * M + m] << " "; // alert: when doing serial, remeber to uncomment line 24 and comment this line
       }
       logFile << "\n";
     }
