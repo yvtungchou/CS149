@@ -8,26 +8,31 @@
 #include <unordered_set>
 #include <unordered_map>
 
-struct Task {
+/*
+    To avoid ambiguity, here I redefine the terms. Task refers to the bigger granularity task, while work is a part of the task that was split out
+    to some thread.
+*/
+struct Work {
     IRunnable* runnable;
-    int i;
-    int num_total_tasks;
+    int work_id;
+    TaskID task_id;
+    int num_total_works;
     std::vector<int> deps;
 
-    Task() {};
+    Work() {};
 
-    Task(IRunnable* runnable_in, int i_in, int num_total_tasks_in) 
-    : runnable(runnable_in), i(i_in), num_total_tasks(num_total_tasks_in), deps({}) {}
-    
-    Task(IRunnable* runnable_in, int i_in, int num_total_tasks_in, std::vector<int> deps_in) 
-    : runnable(runnable_in), i(i_in), num_total_tasks(num_total_tasks_in), deps(deps_in) {}
+    Work(IRunnable* runnable_in, int i_in, int num_total_works_in) 
+    : runnable(runnable_in), work_id(i_in), num_total_works(num_total_works_in), deps({}) {}
+
+    Work(IRunnable* runnable_in, int i_in, TaskID task_id_in, int num_total_works_in, std::vector<int> deps_in) 
+    : runnable(runnable_in), work_id(i_in), task_id(task_id_in), num_total_works(num_total_works_in), deps(deps_in) {}
 };
 
 class ThreadPool {
 public:
     ThreadPool(int num_threads_in);
 
-    void push(Task task);
+    void push(Work task);
 
     void run();
 
@@ -39,7 +44,7 @@ public:
     int num_tasks;
     int num_tasks_finished;
     std::thread *thread_pool;
-    std::queue<Task> q;
+    std::queue<Work> q;
     std::mutex q_mutex;
     std::mutex t_mutex;
     std::condition_variable t_cv;
@@ -49,7 +54,7 @@ class ThreadPoolSleep {
 public:
     ThreadPoolSleep(int num_threads_in);
 
-    void push(Task task);
+    void push(Work work);
 
     void run();
 
@@ -61,7 +66,7 @@ public:
     int num_tasks;
     int num_tasks_finished;
     std::thread *thread_pool;
-    std::queue<Task> q;
+    std::queue<Work> q;
     std::mutex q_mutex;
     std::mutex t_mutex;
     std::condition_variable q_cv;
@@ -72,9 +77,11 @@ class ThreadPool_async {
 public:
     ThreadPool_async(int num_threads_in);
 
-    void push(Task task);
+    void thread_run();
 
-    void run();
+    void push(Work work);
+
+    TaskID run_task(IRunnable* runnable, int num_total_works, const std::vector<TaskID>& deps={});
 
     void sync(int task_id);
 
@@ -83,14 +90,17 @@ public:
     ~ThreadPool_async();
 
     int num_threads;
-    std::unordered_set<int> tasks;
-    std::unordered_map<int, bool> tasks_finished;
+    TaskID task_counter;
+    std::unordered_set<TaskID> tasks;
+    std::unordered_set<TaskID> finished_tasks;
+    std::unordered_map<TaskID, int> num_works;
+    std::unordered_map<TaskID, int> num_works_finished;
     std::thread *thread_pool;
-    std::queue<Task> q;
+    std::queue<Work> q;
     std::mutex q_mutex;
     std::mutex t_mutex;
     std::condition_variable q_cv;
-    std::unordered_map<int, std::condition_variable> t_cv;
+    std::unordered_map<TaskID, std::condition_variable> t_cv;
 };
 
 #endif

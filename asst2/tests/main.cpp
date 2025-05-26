@@ -161,11 +161,11 @@ int main(int argc, char** argv)
         printf("Test name: %s\n", test_names[test_id].c_str());
         printf("============================================================="
                "======================\n");
-
+        
+        // NOTICE: when aoing async test, need to change this i from 0 to 3
         for (int i = 0; i < N_TASKSYS_IMPLS; i++) {
             double minT = 1e30;
             for (int j = 0; j < num_timing_iterations; j++) {
-
                 // Create a new task system
                 ITaskSystem *t = selectTaskSystemRefImpl(num_threads, (TaskSystemType) i);
 

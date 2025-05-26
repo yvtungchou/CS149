@@ -141,7 +141,7 @@ void TaskSystemParallelThreadPoolSpinning::run(IRunnable* runnable, int num_tota
     //
     
     for (int i = 0; i < num_total_tasks; i++) {
-        thread_pool->push(Task(runnable, i, num_total_tasks));
+        thread_pool->push(Work(runnable, i, num_total_tasks));
     }
 
     thread_pool->sync();
@@ -201,9 +201,7 @@ void TaskSystemParallelThreadPoolSleeping::run(IRunnable* runnable, int num_tota
     // tasks sequentially on the calling thread.
     //
 
-    for (int i = 0; i < num_total_tasks; i++) {
-        thread_pool_async->push(Task(runnable, i, num_total_tasks));
-    }
+    thread_pool_async->run_task(runnable, num_total_tasks);
 
     thread_pool_async->sync_all();
     
@@ -220,11 +218,7 @@ TaskID TaskSystemParallelThreadPoolSleeping::runAsyncWithDeps(IRunnable* runnabl
     //
     // TODO: CS149 students will implement this method in Part B.
     //
-    for (int i = 0; i < num_total_tasks; i++) {
-        thread_pool_async->push(Task(runnable, i, num_total_tasks));
-    }
-
-    return 0;
+    return thread_pool_async->run_task(runnable, num_total_tasks, deps);
 }
 
 void TaskSystemParallelThreadPoolSleeping::sync() {
