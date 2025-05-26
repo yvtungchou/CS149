@@ -28,7 +28,7 @@ class ITaskSystem {
            - num_threads: the maximum number of threads that the task system
              can use.
          */
-        ITaskSystem(int num_threads);
+        ITaskSystem(int num_threads_in);
         virtual ~ITaskSystem();
         virtual const char* name() = 0;
 
@@ -66,5 +66,7 @@ class ITaskSystem {
           runXXX calls are done.
          */
         virtual void sync() = 0;
+
+        int num_threads;
 };
 #endif

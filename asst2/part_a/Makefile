@@ -25,10 +25,10 @@ dirs:
 clean:
 	/bin/rm -rf $(OBJDIR) *.ppm *~ $(APP_NAME)
 
-OBJS=$(PPM_OBJ) $(OBJDIR)/tasksys.o
+OBJS=$(PPM_OBJ) $(OBJDIR)/tasksys.o $(OBJDIR)/thread_pool.o
 
 $(APP_NAME): clean dirs $(OBJS)
-	$(CXX) ../tests/main.cpp $(CXXFLAGS) -o $@ $(OBJDIR)/tasksys.o -lm -lpthread
+	$(CXX) ../tests/main.cpp $(CXXFLAGS) -o $@ $(OBJDIR)/tasksys.o $(OBJDIR)/thread_pool.o -lm -lpthread
 
 $(OBJDIR)/%.o: $(COMMONDIR)/%.cpp
 	$(CXX) $< $(CXXFLAGS) -c -o $@

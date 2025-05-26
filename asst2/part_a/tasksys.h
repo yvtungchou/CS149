@@ -2,6 +2,9 @@
 #define _TASKSYS_H
 
 #include "itasksys.h"
+#include "thread_pool.h"
+#include <mutex>
+#include <thread>
 
 /*
  * TaskSystemSerial: This class is the student's implementation of a
@@ -31,9 +34,16 @@ class TaskSystemParallelSpawn: public ITaskSystem {
         ~TaskSystemParallelSpawn();
         const char* name();
         void run(IRunnable* runnable, int num_total_tasks);
+        
+        void run_thread(IRunnable* runnable, int i, int num_total_tasks);
+
         TaskID runAsyncWithDeps(IRunnable* runnable, int num_total_tasks,
                                 const std::vector<TaskID>& deps);
         void sync();
+
+        int num_executing_threads;
+        std::mutex net_mutex;
+        std::condition_variable net_cv;
 };
 
 /*
@@ -44,13 +54,15 @@ class TaskSystemParallelSpawn: public ITaskSystem {
  */
 class TaskSystemParallelThreadPoolSpinning: public ITaskSystem {
     public:
-        TaskSystemParallelThreadPoolSpinning(int num_threads);
+        TaskSystemParallelThreadPoolSpinning(int num_threads_in);
         ~TaskSystemParallelThreadPoolSpinning();
         const char* name();
         void run(IRunnable* runnable, int num_total_tasks);
         TaskID runAsyncWithDeps(IRunnable* runnable, int num_total_tasks,
                                 const std::vector<TaskID>& deps);
         void sync();
+
+        ThreadPool *thread_pool;
 };
 
 /*
@@ -61,13 +73,16 @@ class TaskSystemParallelThreadPoolSpinning: public ITaskSystem {
  */
 class TaskSystemParallelThreadPoolSleeping: public ITaskSystem {
     public:
-        TaskSystemParallelThreadPoolSleeping(int num_threads);
+        TaskSystemParallelThreadPoolSleeping(int num_threads_in);
         ~TaskSystemParallelThreadPoolSleeping();
         const char* name();
         void run(IRunnable* runnable, int num_total_tasks);
         TaskID runAsyncWithDeps(IRunnable* runnable, int num_total_tasks,
                                 const std::vector<TaskID>& deps);
         void sync();
+
+        // ThreadPoolSleep *thread_pool;
+        ThreadPool_async *thread_pool_async;
 };
 
 #endif
